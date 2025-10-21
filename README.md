@@ -1,5 +1,8 @@
 # Scheduler Service
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/zombar/purpletab)](https://goreportcard.com/report/github.com/zombar/purpletab)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/zombar/purpletab)](go.mod)
+
 Manages scheduled tasks for PurpleTab using cron expressions.
 
 ## Task Types
