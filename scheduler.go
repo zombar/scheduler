@@ -35,7 +35,7 @@ type Scheduler struct {
 // New creates a new Scheduler instance
 func New(database *db.DB, config Config) (*Scheduler, error) {
 	// Open controller database for SQL tasks
-	controllerDB, err := sql.Open("sqlite3", config.ControllerDBPath)
+	controllerDB, err := sql.Open("sqlite", config.ControllerDBPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open controller database: %w", err)
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	db, err := New(Config{Driver: "sqlite3", DSN: ":memory:"})
+	db, err := New(Config{Driver: "sqlite", DSN: ":memory:"})
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
@@ -20,7 +20,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestCreateTask(t *testing.T) {
-	db, err := New(Config{Driver: "sqlite3", DSN: ":memory:"})
+	db, err := New(Config{Driver: "sqlite", DSN: ":memory:"})
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestCreateTask(t *testing.T) {
 }
 
 func TestGetTask(t *testing.T) {
-	db, err := New(Config{Driver: "sqlite3", DSN: ":memory:"})
+	db, err := New(Config{Driver: "sqlite", DSN: ":memory:"})
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestGetTask(t *testing.T) {
 }
 
 func TestGetTaskNotFound(t *testing.T) {
-	db, err := New(Config{Driver: "sqlite3", DSN: ":memory:"})
+	db, err := New(Config{Driver: "sqlite", DSN: ":memory:"})
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestGetTaskNotFound(t *testing.T) {
 }
 
 func TestListTasks(t *testing.T) {
-	db, err := New(Config{Driver: "sqlite3", DSN: ":memory:"})
+	db, err := New(Config{Driver: "sqlite", DSN: ":memory:"})
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestListTasks(t *testing.T) {
 }
 
 func TestUpdateTask(t *testing.T) {
-	db, err := New(Config{Driver: "sqlite3", DSN: ":memory:"})
+	db, err := New(Config{Driver: "sqlite", DSN: ":memory:"})
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestUpdateTask(t *testing.T) {
 }
 
 func TestDeleteTask(t *testing.T) {
-	db, err := New(Config{Driver: "sqlite3", DSN: ":memory:"})
+	db, err := New(Config{Driver: "sqlite", DSN: ":memory:"})
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestDeleteTask(t *testing.T) {
 }
 
 func TestUpdateLastRun(t *testing.T) {
-	db, err := New(Config{Driver: "sqlite3", DSN: ":memory:"})
+	db, err := New(Config{Driver: "sqlite", DSN: ":memory:"})
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}

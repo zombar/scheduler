@@ -14,7 +14,7 @@ import (
 // setupTestScheduler creates a test scheduler with in-memory databases
 func setupTestScheduler(t *testing.T) (*Scheduler, *db.DB) {
 	database, err := db.New(db.Config{
-		Driver: "sqlite3",
+		Driver: "sqlite",
 		DSN:    ":memory:",
 	})
 	if err != nil {
