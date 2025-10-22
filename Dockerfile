@@ -2,7 +2,7 @@
 FROM golang:1.24-alpine AS builder
 
 # Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata gcc musl-dev
+RUN apk add --no-cache git ca-certificates tzdata
 
 # Set working directory
 WORKDIR /build
@@ -14,14 +14,14 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build binary with CGO for SQLite
-RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" -o scheduler-api ./cmd/api
+# Build binary (pure Go with modernc.org/sqlite)
+RUN GOOS=linux go build -a -ldflags="-w -s" -o scheduler-api ./cmd/api
 
 # Final stage
 FROM alpine:3.20
 
 # Install minimal runtime dependencies
-RUN apk --no-cache add ca-certificates sqlite
+RUN apk --no-cache add ca-certificates
 
 # Create non-root user
 RUN addgroup -g 1000 scheduler && \

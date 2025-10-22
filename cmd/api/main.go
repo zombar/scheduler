@@ -42,7 +42,7 @@ func main() {
 	config := api.Config{
 		Addr: ":" + *port,
 		DBConfig: db.Config{
-			Driver: "sqlite3",
+			Driver: "sqlite",
 			DSN:    *dbPath,
 		},
 		SchedulerConfig: scheduler.Config{

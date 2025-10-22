@@ -17,7 +17,7 @@ func setupTestServer(t *testing.T) *Server {
 	config := Config{
 		Addr: ":8083",
 		DBConfig: db.Config{
-			Driver: "sqlite3",
+			Driver: "sqlite",
 			DSN:    ":memory:",
 		},
 		SchedulerConfig: scheduler.Config{
