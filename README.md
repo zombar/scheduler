@@ -86,7 +86,7 @@ make build
 ./scheduler-api -port 8080 -db scheduler.db
 
 # Docker
-docker-compose up scheduler
+docker compose up scheduler
 ```
 
 ## Database
