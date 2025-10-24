@@ -26,7 +26,7 @@ Execute SQL operations on the controller database with whitelist validation.
 ```
 
 ### Scrape Tasks
-Schedule routine scrapes with optional link extraction.
+Schedule routine scrapes with optional link extraction. Creates async scrape requests via the controller that are visible in the UI and persist for 24 hours.
 
 **Configuration:**
 ```json
@@ -35,6 +35,12 @@ Schedule routine scrapes with optional link extraction.
   "extract_links": true
 }
 ```
+
+**Behavior:**
+- Scrape requests appear in the web UI's scrape requests list
+- Processed asynchronously by the controller
+- Progress tracked and visible to users
+- Results persist for 24 hours before auto-expiration
 
 ## API Endpoints
 
@@ -74,7 +80,8 @@ Standard cron expressions (minute hour day month weekday)
 - `PORT` - Server port (default: 8080)
 - `DB_PATH` - Scheduler database path
 - `CONTROLLER_DB_PATH` - Controller database path (for SQL tasks)
-- `SCRAPER_URL` - Scraper service URL
+- `CONTROLLER_BASE_URL` - Controller API URL (default: http://localhost:8080)
+- `SCRAPER_URL` - Scraper service URL (legacy, kept for compatibility)
 
 ## Running
 
