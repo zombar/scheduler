@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -19,6 +20,7 @@ import (
 // Config contains scheduler configuration
 type Config struct {
 	ControllerDBPath string
+	ControllerAPIURL string
 	ScraperAPIURL    string
 }
 
@@ -249,12 +251,12 @@ func (s *Scheduler) executeScrapeTask(task *models.Task) error {
 		return err
 	}
 
-	// Call scraper API to scrape the URL
-	scrapeURL := fmt.Sprintf("%s/api/scrape", s.config.ScraperAPIURL)
+	// Call controller API to create scrape request (async)
+	scrapeURL := fmt.Sprintf("%s/api/scrape-requests", s.config.ControllerAPIURL)
 
 	reqBody := map[string]interface{}{
-		"url":   config.URL,
-		"force": true, // Always force re-scrape for scheduled tasks
+		"url":           config.URL,
+		"extract_links": config.ExtractLinks,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -265,38 +267,15 @@ func (s *Scheduler) executeScrapeTask(task *models.Task) error {
 	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Post(scrapeURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return fmt.Errorf("failed to call scraper API: %w", err)
+		return fmt.Errorf("failed to call controller API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("scraper API returned status %d", resp.StatusCode)
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("controller API returned status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	// If extract_links is enabled, call extract-links endpoint
-	if config.ExtractLinks {
-		extractURL := fmt.Sprintf("%s/api/extract-links", s.config.ScraperAPIURL)
-
-		extractReqBody := map[string]interface{}{
-			"url": config.URL,
-		}
-
-		jsonBody, err := json.Marshal(extractReqBody)
-		if err != nil {
-			return fmt.Errorf("failed to marshal extract-links request: %w", err)
-		}
-
-		resp, err := client.Post(extractURL, "application/json", bytes.NewBuffer(jsonBody))
-		if err != nil {
-			return fmt.Errorf("failed to call extract-links API: %w", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("extract-links API returned status %d", resp.StatusCode)
-		}
-	}
-
-	log.Printf("Successfully scraped URL: %s (extract_links: %v)", config.URL, config.ExtractLinks)
+	log.Printf("Successfully created scrape request for URL: %s (extract_links: %v)", config.URL, config.ExtractLinks)
 	return nil
 }

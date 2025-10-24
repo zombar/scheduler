@@ -23,6 +23,7 @@ func setupTestScheduler(t *testing.T) (*Scheduler, *db.DB) {
 
 	config := Config{
 		ControllerDBPath: ":memory:",
+		ControllerAPIURL: "http://localhost:8080",
 		ScraperAPIURL:    "http://localhost:8081",
 	}
 
@@ -420,7 +421,7 @@ func TestExecuteScrapeTask(t *testing.T) {
 	defer scheduler.Stop()
 
 	// Update config to use mock server
-	scheduler.config.ScraperAPIURL = mockServer.URL
+	scheduler.config.ControllerAPIURL = mockServer.URL
 
 	task := &models.Task{
 		ID:       1,
@@ -438,15 +439,13 @@ func TestExecuteScrapeTask(t *testing.T) {
 }
 
 func TestExecuteScrapeTaskWithExtractLinks(t *testing.T) {
-	// Create mock scraper server
+	// Create mock controller server
 	callCount := 0
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 		w.WriteHeader(http.StatusOK)
-		if r.URL.Path == "/api/scrape" {
-			fmt.Fprintf(w, `{"id":"test-id"}`)
-		} else if r.URL.Path == "/api/extract-links" {
-			fmt.Fprintf(w, `{"links":["https://example.com/1","https://example.com/2"]}`)
+		if r.URL.Path == "/api/scrape-requests" {
+			fmt.Fprintf(w, `{"id":"test-id","status":"pending"}`)
 		}
 	}))
 	defer mockServer.Close()
@@ -456,7 +455,7 @@ func TestExecuteScrapeTaskWithExtractLinks(t *testing.T) {
 	defer scheduler.Stop()
 
 	// Update config to use mock server
-	scheduler.config.ScraperAPIURL = mockServer.URL
+	scheduler.config.ControllerAPIURL = mockServer.URL
 
 	task := &models.Task{
 		ID:       1,
@@ -472,14 +471,14 @@ func TestExecuteScrapeTaskWithExtractLinks(t *testing.T) {
 		t.Fatalf("Failed to execute scrape task: %v", err)
 	}
 
-	// Should have called both scrape and extract-links endpoints
-	if callCount != 2 {
-		t.Errorf("Expected 2 API calls (scrape + extract-links), got %d", callCount)
+	// Should have called scrape-requests endpoint once (handles extract_links internally)
+	if callCount != 1 {
+		t.Errorf("Expected 1 API call to scrape-requests, got %d", callCount)
 	}
 }
 
 func TestExecuteScrapeTaskServerError(t *testing.T) {
-	// Create mock scraper server that returns error
+	// Create mock controller server that returns error
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, `{"error":"Internal server error"}`)
@@ -491,7 +490,7 @@ func TestExecuteScrapeTaskServerError(t *testing.T) {
 	defer scheduler.Stop()
 
 	// Update config to use mock server
-	scheduler.config.ScraperAPIURL = mockServer.URL
+	scheduler.config.ControllerAPIURL = mockServer.URL
 
 	task := &models.Task{
 		ID:       1,

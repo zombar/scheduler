@@ -22,6 +22,7 @@ func setupTestServer(t *testing.T) *Server {
 		},
 		SchedulerConfig: scheduler.Config{
 			ControllerDBPath: ":memory:",
+			ControllerAPIURL: "http://localhost:8080",
 			ScraperAPIURL:    "http://localhost:8081",
 		},
 		CORSEnabled: false,

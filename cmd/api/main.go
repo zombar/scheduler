@@ -28,12 +28,14 @@ func main() {
 	defaultPort := getEnv("PORT", "8080")
 	defaultDBPath := getEnv("DB_PATH", "scheduler.db")
 	defaultControllerDBPath := getEnv("CONTROLLER_DB_PATH", "../controller/controller.db")
+	defaultControllerURL := getEnv("CONTROLLER_BASE_URL", "http://localhost:8080")
 	defaultScraperURL := getEnv("SCRAPER_URL", "http://localhost:8081")
 
 	// Command-line flags (override environment variables)
 	port := flag.String("port", defaultPort, "Server port")
 	dbPath := flag.String("db", defaultDBPath, "Database file path")
 	controllerDBPath := flag.String("controller-db", defaultControllerDBPath, "Controller database path")
+	controllerURL := flag.String("controller-url", defaultControllerURL, "Controller API URL")
 	scraperURL := flag.String("scraper-url", defaultScraperURL, "Scraper API URL")
 	disableCORS := flag.Bool("disable-cors", false, "Disable CORS")
 	flag.Parse()
@@ -47,6 +49,7 @@ func main() {
 		},
 		SchedulerConfig: scheduler.Config{
 			ControllerDBPath: *controllerDBPath,
+			ControllerAPIURL: *controllerURL,
 			ScraperAPIURL:    *scraperURL,
 		},
 		CORSEnabled: !*disableCORS,
