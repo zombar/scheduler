@@ -72,6 +72,11 @@ func (d *DB) Close() error {
 	return d.db.Close()
 }
 
+// DB returns the underlying database connection for metrics collection
+func (d *DB) DB() *sql.DB {
+	return d.db
+}
+
 // CreateTask creates a new task
 func (d *DB) CreateTask(task *models.Task) error {
 	now := time.Now()

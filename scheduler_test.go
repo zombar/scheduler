@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -351,7 +352,7 @@ func TestExecuteSQLTask(t *testing.T) {
 		Enabled:  true,
 	}
 
-	err = scheduler.executeSQLTask(task)
+	err = scheduler.executeSQLTask(context.Background(), task)
 	if err != nil {
 		t.Fatalf("Failed to execute SQL task: %v", err)
 	}
@@ -382,7 +383,7 @@ func TestExecuteSQLTaskInvalidSQL(t *testing.T) {
 		Enabled:  true,
 	}
 
-	err := scheduler.executeSQLTask(task)
+	err := scheduler.executeSQLTask(context.Background(), task)
 	if err == nil {
 		t.Error("Expected error for malicious SQL")
 	}
@@ -402,7 +403,7 @@ func TestExecuteSQLTaskInvalidDatabase(t *testing.T) {
 		Enabled:  true,
 	}
 
-	err := scheduler.executeSQLTask(task)
+	err := scheduler.executeSQLTask(context.Background(), task)
 	if err == nil {
 		t.Error("Expected error for invalid target database")
 	}
@@ -432,7 +433,7 @@ func TestExecuteScrapeTask(t *testing.T) {
 		Enabled:  true,
 	}
 
-	err := scheduler.executeScrapeTask(task)
+	err := scheduler.executeScrapeTask(context.Background(), task)
 	if err != nil {
 		t.Fatalf("Failed to execute scrape task: %v", err)
 	}
@@ -466,7 +467,7 @@ func TestExecuteScrapeTaskWithExtractLinks(t *testing.T) {
 		Enabled:  true,
 	}
 
-	err := scheduler.executeScrapeTask(task)
+	err := scheduler.executeScrapeTask(context.Background(), task)
 	if err != nil {
 		t.Fatalf("Failed to execute scrape task: %v", err)
 	}
@@ -501,7 +502,7 @@ func TestExecuteScrapeTaskServerError(t *testing.T) {
 		Enabled:  true,
 	}
 
-	err := scheduler.executeScrapeTask(task)
+	err := scheduler.executeScrapeTask(context.Background(), task)
 	if err == nil {
 		t.Error("Expected error when scraper returns error")
 	}
