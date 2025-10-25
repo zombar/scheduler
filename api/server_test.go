@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/zombar/scheduler"
 	"github.com/zombar/scheduler/db"
 	"github.com/zombar/scheduler/models"
@@ -14,6 +15,9 @@ import (
 
 // setupTestServer creates a test server with in-memory database
 func setupTestServer(t *testing.T) *Server {
+	// Reset Prometheus registry to avoid metric registration conflicts between tests
+	prometheus.DefaultRegisterer = prometheus.NewRegistry()
+
 	config := Config{
 		Addr: ":8083",
 		DBConfig: db.Config{

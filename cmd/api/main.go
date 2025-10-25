@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/zombar/purpletab/pkg/tracing"
 	"github.com/zombar/scheduler"
 	"github.com/zombar/scheduler/api"
 	"github.com/zombar/scheduler/db"
@@ -24,6 +24,27 @@ func getEnv(key, defaultValue string) string {
 }
 
 func main() {
+	// Setup structured logging with JSON output
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+
+	logger.Info("scheduler service initializing", "version", "1.0.0")
+
+	// Initialize tracing
+	tp, err := tracing.InitTracer("purpletab-scheduler")
+	if err != nil {
+		logger.Warn("failed to initialize tracer, continuing without tracing", "error", err)
+	} else {
+		defer func() {
+			if err := tp.Shutdown(context.Background()); err != nil {
+				logger.Error("error shutting down tracer", "error", err)
+			}
+		}()
+		logger.Info("tracing initialized successfully")
+	}
+
 	// Default values
 	defaultPort := getEnv("PORT", "8080")
 	defaultDBPath := getEnv("DB_PATH", "scheduler.db")
@@ -58,13 +79,23 @@ func main() {
 	// Create server
 	server, err := api.NewServer(config)
 	if err != nil {
-		log.Fatalf("Failed to create server: %v", err)
+		logger.Error("failed to create server", "error", err)
+		os.Exit(1)
 	}
 
 	// Start server in a goroutine
 	go func() {
+		logger.Info("scheduler service starting",
+			"port", *port,
+			"database", *dbPath,
+			"controller_db_path", *controllerDBPath,
+			"controller_url", *controllerURL,
+			"scraper_url", *scraperURL,
+		)
+
 		if err := server.Start(); err != nil {
-			log.Fatalf("Server error: %v", err)
+			logger.Error("server error", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -74,13 +105,14 @@ func main() {
 	<-quit
 
 	// Graceful shutdown
-	fmt.Println("\nShutting down gracefully...")
+	logger.Info("shutting down gracefully")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server shutdown error: %v", err)
+		logger.Error("server shutdown error", "error", err)
+		os.Exit(1)
 	}
 
-	fmt.Println("Server stopped")
+	logger.Info("server stopped")
 }

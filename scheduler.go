@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,8 +14,10 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	"github.com/zombar/purpletab/pkg/tracing"
 	"github.com/zombar/scheduler/db"
 	"github.com/zombar/scheduler/models"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // Config contains scheduler configuration
@@ -145,12 +148,22 @@ func (s *Scheduler) RescheduleTask(task *models.Task) error {
 func (s *Scheduler) executeTask(task *models.Task) error {
 	log.Printf("Executing task %d (%s) of type %s", task.ID, task.Name, task.Type)
 
+	// Create root span for scheduled task execution
+	ctx, span := tracing.StartSpan(context.Background(), fmt.Sprintf("scheduler.task.%s", task.Type))
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.Int64("task.id", task.ID),
+		attribute.String("task.name", task.Name),
+		attribute.String("task.type", string(task.Type)),
+		attribute.String("task.schedule", task.Schedule))
+
 	var err error
 	switch task.Type {
 	case models.TaskTypeSQL:
-		err = s.executeSQLTask(task)
+		err = s.executeSQLTask(ctx, task)
 	case models.TaskTypeScrape:
-		err = s.executeScrapeTask(task)
+		err = s.executeScrapeTask(ctx, task)
 	default:
 		err = fmt.Errorf("unknown task type: %s", task.Type)
 	}
@@ -170,24 +183,38 @@ func (s *Scheduler) executeTask(task *models.Task) error {
 	s.db.UpdateTaskRunTime(task.ID, now, nextRun)
 
 	if err != nil {
+		tracing.RecordError(ctx, err)
 		return err
 	}
 
+	tracing.AddEvent(ctx, "task_completed",
+		attribute.Int64("task.id", task.ID))
 	log.Printf("Task %d (%s) completed successfully", task.ID, task.Name)
 	return nil
 }
 
 // executeSQLTask executes a SQL task with whitelist validation
-func (s *Scheduler) executeSQLTask(task *models.Task) error {
+func (s *Scheduler) executeSQLTask(ctx context.Context, task *models.Task) error {
+	ctx, span := tracing.StartSpan(ctx, "task.sql.execute")
+	defer span.End()
+
 	config, err := db.ParseSQLTaskConfig(task.Config)
 	if err != nil {
+		tracing.RecordError(ctx, err)
 		return err
 	}
 
+	span.SetAttributes(
+		attribute.String("sql.target_db", config.TargetDB))
+
 	// Validate SQL against whitelist
+	ctx, validateSpan := tracing.StartSpan(ctx, "sql.validate")
 	if err := validateSQL(config.SQL); err != nil {
+		tracing.RecordError(ctx, err)
+		validateSpan.End()
 		return fmt.Errorf("SQL validation failed: %w", err)
 	}
+	validateSpan.End()
 
 	// Execute SQL on target database
 	var targetDB *sql.DB
@@ -195,14 +222,25 @@ func (s *Scheduler) executeSQLTask(task *models.Task) error {
 	case "controller":
 		targetDB = s.controllerDB
 	default:
-		return fmt.Errorf("unknown target database: %s", config.TargetDB)
+		err := fmt.Errorf("unknown target database: %s", config.TargetDB)
+		tracing.RecordError(ctx, err)
+		return err
 	}
 
 	// Execute the SQL
-	_, err = targetDB.Exec(config.SQL)
+	ctx, execSpan := tracing.StartSpan(ctx, "sql.exec")
+	result, err := targetDB.Exec(config.SQL)
 	if err != nil {
+		tracing.RecordError(ctx, err)
+		execSpan.End()
 		return fmt.Errorf("SQL execution failed: %w", err)
 	}
+
+	// Add result metrics
+	if rowsAffected, err := result.RowsAffected(); err == nil {
+		execSpan.SetAttributes(attribute.Int64("sql.rows_affected", rowsAffected))
+	}
+	execSpan.End()
 
 	return nil
 }
@@ -245,11 +283,19 @@ func validateSQL(sql string) error {
 }
 
 // executeScrapeTask executes a scrape task
-func (s *Scheduler) executeScrapeTask(task *models.Task) error {
+func (s *Scheduler) executeScrapeTask(ctx context.Context, task *models.Task) error {
+	ctx, span := tracing.StartSpan(ctx, "task.scrape.execute")
+	defer span.End()
+
 	config, err := db.ParseScrapeTaskConfig(task.Config)
 	if err != nil {
+		tracing.RecordError(ctx, err)
 		return err
 	}
+
+	span.SetAttributes(
+		attribute.String("scrape.url", config.URL),
+		attribute.Bool("scrape.extract_links", config.ExtractLinks))
 
 	// Call controller API to create scrape request (async)
 	scrapeURL := fmt.Sprintf("%s/api/scrape-requests", s.config.ControllerAPIURL)
@@ -261,21 +307,37 @@ func (s *Scheduler) executeScrapeTask(task *models.Task) error {
 
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
+		tracing.RecordError(ctx, err)
 		return fmt.Errorf("failed to marshal scrape request: %w", err)
 	}
+
+	ctx, httpSpan := tracing.StartSpan(ctx, "http.client.controller")
+	httpSpan.SetAttributes(
+		attribute.String("http.method", "POST"),
+		attribute.String("http.url", scrapeURL))
 
 	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Post(scrapeURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
+		tracing.RecordError(ctx, err)
+		httpSpan.End()
 		return fmt.Errorf("failed to call controller API: %w", err)
 	}
 	defer resp.Body.Close()
 
+	httpSpan.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
+
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("controller API returned status %d: %s", resp.StatusCode, string(bodyBytes))
+		err := fmt.Errorf("controller API returned status %d: %s", resp.StatusCode, string(bodyBytes))
+		tracing.RecordError(ctx, err)
+		httpSpan.End()
+		return err
 	}
+	httpSpan.End()
 
+	tracing.AddEvent(ctx, "scrape_request_created",
+		attribute.String("url", config.URL))
 	log.Printf("Successfully created scrape request for URL: %s (extract_links: %v)", config.URL, config.ExtractLinks)
 	return nil
 }
