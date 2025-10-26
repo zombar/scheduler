@@ -8,9 +8,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/zombar/purpletab/pkg/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zombar/purpletab/pkg/tracing"
 	"github.com/zombar/scheduler"
 	"github.com/zombar/scheduler/db"
@@ -28,12 +27,10 @@ type Config struct {
 
 // Server represents the HTTP server
 type Server struct {
-	config      Config
-	db          *db.DB
-	scheduler   *scheduler.Scheduler
-	server      *http.Server
-	httpMetrics *metrics.HTTPMetrics
-	dbMetrics   *metrics.DatabaseMetrics
+	config    Config
+	db        *db.DB
+	scheduler *scheduler.Scheduler
+	server    *http.Server
 }
 
 // NewServer creates a new server instance
@@ -50,42 +47,26 @@ func NewServer(config Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to initialize scheduler: %w", err)
 	}
 
-	// Initialize Prometheus metrics
-	httpMetrics := metrics.NewHTTPMetrics("scheduler")
-	dbMetrics := metrics.NewDatabaseMetrics("scheduler")
-
 	s := &Server{
-		config:      config,
-		db:          database,
-		scheduler:   sched,
-		httpMetrics: httpMetrics,
-		dbMetrics:   dbMetrics,
+		config:    config,
+		db:        database,
+		scheduler: sched,
 	}
-
-	// Start periodic database stats collection
-	go func() {
-		ticker := time.NewTicker(15 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			dbMetrics.UpdateDBStats(database.DB())
-		}
-	}()
 
 	// Setup routes
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", metrics.Handler()) // Prometheus metrics endpoint
+	mux.Handle("/metrics", promhttp.Handler()) // Prometheus metrics endpoint
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/api/tasks", s.handleTasks)
 	mux.HandleFunc("/api/tasks/", s.handleTaskByID)
 
-	// Wrap with middleware chain: metrics -> HTTP logging -> tracing -> CORS -> handlers
+	// Wrap with middleware chain: HTTP logging -> tracing -> CORS -> handlers
 	var handler http.Handler = mux
 	if config.CORSEnabled {
 		handler = corsMiddleware(handler)
 	}
 	handler = tracing.HTTPMiddleware("scheduler")(handler)
 	handler = logging.HTTPLoggingMiddleware(slog.Default())(handler)
-	handler = httpMetrics.HTTPMiddleware(handler)
 
 	s.server = &http.Server{
 		Addr:    config.Addr,
@@ -104,6 +85,11 @@ func (s *Server) Start() error {
 
 	slog.Info("starting server", "addr", s.config.Addr)
 	return s.server.ListenAndServe()
+}
+
+// DB returns the database instance for metrics collection
+func (s *Server) DB() *db.DB {
+	return s.db
 }
 
 // Shutdown gracefully shuts down the server
