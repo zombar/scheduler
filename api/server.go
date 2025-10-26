@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,6 +15,7 @@ import (
 	"github.com/zombar/scheduler"
 	"github.com/zombar/scheduler/db"
 	"github.com/zombar/scheduler/models"
+	"github.com/zombar/scheduler/pkg/logging"
 )
 
 // Config contains server configuration
@@ -77,12 +78,13 @@ func NewServer(config Config) (*Server, error) {
 	mux.HandleFunc("/api/tasks", s.handleTasks)
 	mux.HandleFunc("/api/tasks/", s.handleTaskByID)
 
-	// Wrap with middleware chain: metrics -> tracing -> CORS -> handlers
+	// Wrap with middleware chain: metrics -> HTTP logging -> tracing -> CORS -> handlers
 	var handler http.Handler = mux
 	if config.CORSEnabled {
 		handler = corsMiddleware(handler)
 	}
 	handler = tracing.HTTPMiddleware("scheduler")(handler)
+	handler = logging.HTTPLoggingMiddleware(slog.Default())(handler)
 	handler = httpMetrics.HTTPMiddleware(handler)
 
 	s.server = &http.Server{
@@ -100,7 +102,7 @@ func (s *Server) Start() error {
 		return fmt.Errorf("failed to start scheduler: %w", err)
 	}
 
-	log.Printf("Starting server on %s", s.config.Addr)
+	slog.Info("starting server", "addr", s.config.Addr)
 	return s.server.ListenAndServe()
 }
 
@@ -108,12 +110,12 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	// Stop scheduler first
 	if err := s.scheduler.Stop(); err != nil {
-		log.Printf("Error stopping scheduler: %v", err)
+		slog.Error("error stopping scheduler", "error", err)
 	}
 
 	// Close database
 	if err := s.db.Close(); err != nil {
-		log.Printf("Error closing database: %v", err)
+		slog.Error("error closing database", "error", err)
 	}
 
 	// Shutdown HTTP server
@@ -196,7 +198,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	// Schedule task if enabled
 	if task.Enabled {
 		if err := s.scheduler.RescheduleTask(&task); err != nil {
-			log.Printf("Failed to schedule task %d: %v", task.ID, err)
+			slog.Error("failed to schedule task", "task_id", task.ID, "error", err)
 		}
 	}
 
@@ -247,7 +249,7 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request, id int
 
 	// Reschedule task
 	if err := s.scheduler.RescheduleTask(&task); err != nil {
-		log.Printf("Failed to reschedule task %d: %v", task.ID, err)
+		slog.Error("failed to reschedule task", "task_id", task.ID, "error", err)
 	}
 
 	respondJSON(w, http.StatusOK, task)
