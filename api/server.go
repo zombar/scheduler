@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/zombar/purpletab/pkg/metrics"
 	"github.com/zombar/purpletab/pkg/tracing"
 	"github.com/zombar/scheduler"
 	"github.com/zombar/scheduler/db"
@@ -60,12 +61,13 @@ func NewServer(config Config) (*Server, error) {
 	mux.HandleFunc("/api/tasks", s.handleTasks)
 	mux.HandleFunc("/api/tasks/", s.handleTaskByID)
 
-	// Wrap with middleware chain: HTTP logging -> tracing -> CORS -> handlers
+	// Wrap with middleware chain: HTTP logging -> metrics -> tracing -> CORS -> handlers
 	var handler http.Handler = mux
 	if config.CORSEnabled {
 		handler = corsMiddleware(handler)
 	}
 	handler = tracing.HTTPMiddleware("scheduler")(handler)
+	handler = metrics.HTTPMiddleware("scheduler")(handler)
 	handler = logging.HTTPLoggingMiddleware(slog.Default())(handler)
 
 	s.server = &http.Server{
