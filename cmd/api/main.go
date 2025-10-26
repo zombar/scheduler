@@ -33,7 +33,7 @@ func main() {
 	logger.Info("scheduler service initializing", "version", "1.0.0")
 
 	// Initialize tracing
-	tp, err := tracing.InitTracer("purpletab-scheduler")
+	tp, err := tracing.InitTracer("docutab-scheduler")
 	if err != nil {
 		logger.Warn("failed to initialize tracer, continuing without tracing", "error", err)
 	} else {
