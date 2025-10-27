@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/lib/pq"      // PostgreSQL driver
+	_ "modernc.org/sqlite"     // SQLite driver
 	"github.com/zombar/scheduler/models"
 )
 
@@ -34,9 +35,15 @@ func New(config Config) (*DB, error) {
 
 	d := &DB{db: db}
 
-	// Run migrations
-	if err := d.migrate(); err != nil {
-		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	// Run migrations based on driver type
+	if config.Driver == "postgres" {
+		if err := d.migratePostgres(); err != nil {
+			return nil, fmt.Errorf("failed to run migrations: %w", err)
+		}
+	} else {
+		if err := d.migrate(); err != nil {
+			return nil, fmt.Errorf("failed to run migrations: %w", err)
+		}
 	}
 
 	return d, nil
