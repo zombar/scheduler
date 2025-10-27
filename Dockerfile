@@ -33,7 +33,7 @@ RUN addgroup -g 1000 scheduler && \
     adduser -D -u 1000 -G scheduler scheduler
 
 # Create necessary directories
-RUN mkdir -p /app/data && \
+RUN mkdir -p /app && \
     chown -R scheduler:scheduler /app
 
 WORKDIR /app
@@ -47,9 +47,6 @@ COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 # Switch to non-root user
 USER scheduler
 
-# Create volume for persistent data
-VOLUME /app/data
-
 # Expose API port
 EXPOSE 8080
 
@@ -58,4 +55,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Default to running the API server
-CMD ["./scheduler-api", "-port", "8080", "-db", "/app/data/scheduler.db"]
+CMD ["./scheduler-api", "-port", "8080"]
