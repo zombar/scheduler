@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -48,29 +49,39 @@ func main() {
 
 	// Default values
 	defaultPort := getEnv("PORT", "8080")
-	defaultDBPath := getEnv("DB_PATH", "scheduler.db")
-	defaultControllerDBPath := getEnv("CONTROLLER_DB_PATH", "../controller/controller.db")
+	defaultDBHost := getEnv("DB_HOST", "localhost")
+	defaultDBPort := getEnv("DB_PORT", "5432")
+	defaultDBUser := getEnv("DB_USER", "docutab")
+	defaultDBPassword := getEnv("DB_PASSWORD", "docutab_dev_pass")
+	defaultDBName := getEnv("DB_NAME", "docutab")
 	defaultControllerURL := getEnv("CONTROLLER_BASE_URL", "http://localhost:8080")
 	defaultScraperURL := getEnv("SCRAPER_URL", "http://localhost:8081")
 
 	// Command-line flags (override environment variables)
 	port := flag.String("port", defaultPort, "Server port")
-	dbPath := flag.String("db", defaultDBPath, "Database file path")
-	controllerDBPath := flag.String("controller-db", defaultControllerDBPath, "Controller database path")
+	dbHost := flag.String("db-host", defaultDBHost, "PostgreSQL host")
+	dbPort := flag.String("db-port", defaultDBPort, "PostgreSQL port")
+	dbUser := flag.String("db-user", defaultDBUser, "PostgreSQL user")
+	dbPassword := flag.String("db-password", defaultDBPassword, "PostgreSQL password")
+	dbName := flag.String("db-name", defaultDBName, "PostgreSQL database name")
 	controllerURL := flag.String("controller-url", defaultControllerURL, "Controller API URL")
 	scraperURL := flag.String("scraper-url", defaultScraperURL, "Scraper API URL")
 	disableCORS := flag.Bool("disable-cors", false, "Disable CORS")
 	flag.Parse()
 
+	// Construct PostgreSQL connection string
+	dbDSN := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		*dbHost, *dbPort, *dbUser, *dbPassword, *dbName)
+
 	// Create server configuration
 	config := api.Config{
 		Addr: ":" + *port,
 		DBConfig: db.Config{
-			Driver: "sqlite",
-			DSN:    *dbPath,
+			Driver: "postgres",
+			DSN:    dbDSN,
 		},
 		SchedulerConfig: scheduler.Config{
-			ControllerDBPath: *controllerDBPath,
+			ControllerDBPath: "", // No longer needed - scheduler uses same PostgreSQL database
 			ControllerAPIURL: *controllerURL,
 			ScraperAPIURL:    *scraperURL,
 		},
@@ -99,8 +110,8 @@ func main() {
 	go func() {
 		logger.Info("scheduler service starting",
 			"port", *port,
-			"database", *dbPath,
-			"controller_db_path", *controllerDBPath,
+			"db_host", *dbHost,
+			"db_name", *dbName,
 			"controller_url", *controllerURL,
 			"scraper_url", *scraperURL,
 		)
