@@ -98,7 +98,7 @@ docker compose up scheduler
 
 ## Database
 
-SQLite database storing task definitions and execution history.
+PostgreSQL database storing task definitions and execution history.
 
 **Schema:**
 - `id` - Task ID
@@ -109,3 +109,5 @@ SQLite database storing task definitions and execution history.
 - `enabled` - Execution enabled
 - `last_run_at` - Last execution time
 - `next_run_at` - Next scheduled execution
+
+The shared database package (`pkg/database`) provides connection pooling and OpenTelemetry instrumentation.
