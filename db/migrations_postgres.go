@@ -2,7 +2,7 @@ package db
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 )
 
 // Migration represents a database migration
@@ -50,29 +50,29 @@ var postgresMigrations = []Migration{
 
 // migratePostgres runs PostgreSQL-specific database migrations
 func (d *DB) migratePostgres() error {
-	log.Println("Creating schema_version table...")
+	slog.Default().Info("creating schema_version table")
 	// Ensure schema_version table exists
 	if _, err := d.db.Exec(postgresMigrations[1].SQL); err != nil {
 		return fmt.Errorf("failed to create schema_version table: %w", err)
 	}
 
-	log.Println("Checking current schema version...")
+	slog.Default().Info("checking current schema version")
 	// Get current version
 	var currentVersion int
 	err := d.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_version").Scan(&currentVersion)
 	if err != nil {
 		return fmt.Errorf("failed to get current version: %w", err)
 	}
-	log.Printf("Current schema version: %d", currentVersion)
+	slog.Default().Info("current schema version", "version", currentVersion)
 
 	// Run pending migrations
 	for _, migration := range postgresMigrations {
 		if migration.Version <= currentVersion {
-			log.Printf("Skipping migration %d (already applied)", migration.Version)
+			slog.Default().Debug("skipping migration (already applied)", "version", migration.Version)
 			continue
 		}
 
-		log.Printf("Applying migration %d: %s", migration.Version, migration.Name)
+		slog.Default().Info("applying migration", "version", migration.Version, "name", migration.Name)
 		tx, err := d.db.Begin()
 		if err != nil {
 			return fmt.Errorf("failed to begin transaction for migration %d: %w", migration.Version, err)
@@ -94,9 +94,9 @@ func (d *DB) migratePostgres() error {
 			return fmt.Errorf("failed to commit migration %d: %w", migration.Version, err)
 		}
 
-		log.Printf("✓ Applied migration %d: %s", migration.Version, migration.Name)
+		slog.Default().Info("migration applied successfully", "version", migration.Version, "name", migration.Name)
 	}
 
-	log.Println("All migrations complete")
+	slog.Default().Info("all migrations complete")
 	return nil
 }
