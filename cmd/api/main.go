@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/zombar/purpletab/pkg/metrics"
 	"github.com/zombar/purpletab/pkg/tracing"
 	"github.com/zombar/scheduler"
