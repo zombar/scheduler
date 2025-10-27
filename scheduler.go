@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -67,13 +67,13 @@ func (s *Scheduler) Start() error {
 	// Schedule all tasks
 	for _, task := range tasks {
 		if err := s.scheduleTask(task); err != nil {
-			log.Printf("Failed to schedule task %d (%s): %v", task.ID, task.Name, err)
+			slog.Default().Error("failed to schedule task", "task_id", task.ID, "task_name", task.Name, "error", err)
 		}
 	}
 
 	// Start cron
 	s.cron.Start()
-	log.Println("Scheduler started")
+	slog.Default().Info("scheduler started")
 
 	return nil
 }
@@ -87,7 +87,7 @@ func (s *Scheduler) Stop() error {
 		s.controllerDB.Close()
 	}
 
-	log.Println("Scheduler stopped")
+	slog.Default().Info("scheduler stopped")
 	return nil
 }
 
@@ -99,7 +99,7 @@ func (s *Scheduler) scheduleTask(task *models.Task) error {
 	// Parse cron schedule
 	entryID, err := s.cron.AddFunc(task.Schedule, func() {
 		if err := s.executeTask(task); err != nil {
-			log.Printf("Task %d (%s) execution failed: %v", task.ID, task.Name, err)
+			slog.Default().Error("task execution failed", "task_id", task.ID, "task_name", task.Name, "error", err)
 		}
 	})
 
@@ -115,8 +115,7 @@ func (s *Scheduler) scheduleTask(task *models.Task) error {
 	task.NextRunAt = &nextRun
 	s.db.UpdateTaskRunTime(task.ID, time.Now(), &nextRun)
 
-	log.Printf("Scheduled task %d (%s) with schedule %s, next run: %s",
-		task.ID, task.Name, task.Schedule, nextRun.Format(time.RFC3339))
+	slog.Default().Info("scheduled task", "task_id", task.ID, "task_name", task.Name, "schedule", task.Schedule, "next_run", nextRun.Format(time.RFC3339))
 
 	return nil
 }
@@ -129,7 +128,7 @@ func (s *Scheduler) unscheduleTask(taskID int64) {
 	if entryID, exists := s.taskEntries[taskID]; exists {
 		s.cron.Remove(entryID)
 		delete(s.taskEntries, taskID)
-		log.Printf("Unscheduled task %d", taskID)
+		slog.Default().Info("unscheduled task", "task_id", taskID)
 	}
 }
 
@@ -146,7 +145,7 @@ func (s *Scheduler) RescheduleTask(task *models.Task) error {
 
 // executeTask executes a single task
 func (s *Scheduler) executeTask(task *models.Task) error {
-	log.Printf("Executing task %d (%s) of type %s", task.ID, task.Name, task.Type)
+	slog.Default().Info("executing task", "task_id", task.ID, "task_name", task.Name, "task_type", task.Type)
 
 	// Create root span for scheduled task execution
 	ctx, span := tracing.StartSpan(context.Background(), fmt.Sprintf("scheduler.task.%s", task.Type))
@@ -189,7 +188,7 @@ func (s *Scheduler) executeTask(task *models.Task) error {
 
 	tracing.AddEvent(ctx, "task_completed",
 		attribute.Int64("task.id", task.ID))
-	log.Printf("Task %d (%s) completed successfully", task.ID, task.Name)
+	slog.Default().Info("task completed successfully", "task_id", task.ID, "task_name", task.Name)
 	return nil
 }
 
@@ -338,6 +337,6 @@ func (s *Scheduler) executeScrapeTask(ctx context.Context, task *models.Task) er
 
 	tracing.AddEvent(ctx, "scrape_request_created",
 		attribute.String("url", config.URL))
-	log.Printf("Successfully created scrape request for URL: %s (extract_links: %v)", config.URL, config.ExtractLinks)
+	slog.Default().Info("successfully created scrape request", "url", config.URL, "extract_links", config.ExtractLinks)
 	return nil
 }
