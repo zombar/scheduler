@@ -61,14 +61,24 @@ func NewServer(config Config) (*Server, error) {
 	mux.HandleFunc("/api/tasks", s.handleTasks)
 	mux.HandleFunc("/api/tasks/", s.handleTaskByID)
 
-	// Wrap with middleware chain: HTTP logging -> metrics -> tracing -> CORS -> handlers
+	// Setup server with middleware chain (applied bottom-up, executes top-down):
+	// Execution order: CORS -> tracing -> metrics -> logging -> handlers
+	// This ensures tracing creates span BEFORE logging tries to read trace context
 	var handler http.Handler = mux
+
+	// Add HTTP request logging (innermost, executes last)
+	handler = logging.HTTPLoggingMiddleware(slog.Default())(handler)
+
+	// Add HTTP metrics middleware
+	handler = metrics.HTTPMiddleware("scheduler")(handler)
+
+	// Wrap with tracing middleware (executes early to create span)
+	handler = tracing.HTTPMiddleware("scheduler")(handler)
+
+	// Apply CORS middleware (outermost, executes first)
 	if config.CORSEnabled {
 		handler = corsMiddleware(handler)
 	}
-	handler = tracing.HTTPMiddleware("scheduler")(handler)
-	handler = metrics.HTTPMiddleware("scheduler")(handler)
-	handler = logging.HTTPLoggingMiddleware(slog.Default())(handler)
 
 	s.server = &http.Server{
 		Addr:    config.Addr,
