@@ -225,7 +225,7 @@ func (d *DB) GetEnabledTasks() ([]*models.Task, error) {
 		SELECT id, name, description, type, schedule, config, enabled,
 		       created_at, updated_at, last_run_at, next_run_at
 		FROM tasks
-		WHERE enabled = 1
+		WHERE enabled = true
 		ORDER BY id
 	`)
 	if err != nil {
