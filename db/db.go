@@ -114,13 +114,24 @@ func (d *DB) CreateTask(task *models.Task) error {
 	task.CreatedAt = now
 	task.UpdatedAt = now
 
-	query := d.rebindQuery(`
+	// PostgreSQL doesn't support LastInsertId(), use RETURNING clause instead
+	if d.driver == "postgres" {
+		query := `
+			INSERT INTO tasks (name, description, type, schedule, config, enabled, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			RETURNING id
+		`
+		err := d.db.QueryRow(query, task.Name, task.Description, task.Type, task.Schedule, task.Config, task.Enabled, task.CreatedAt, task.UpdatedAt).Scan(&task.ID)
+		return err
+	}
+
+	// SQLite supports LastInsertId()
+	query := `
 		INSERT INTO tasks (name, description, type, schedule, config, enabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`)
+	`
 
 	result, err := d.db.Exec(query, task.Name, task.Description, task.Type, task.Schedule, task.Config, task.Enabled, task.CreatedAt, task.UpdatedAt)
-
 	if err != nil {
 		return err
 	}
