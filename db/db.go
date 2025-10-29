@@ -19,7 +19,8 @@ type Config struct {
 
 // DB wraps database operations
 type DB struct {
-	db *sql.DB
+	db     *sql.DB
+	driver string
 }
 
 // New creates a new database connection
@@ -33,7 +34,10 @@ func New(config Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	d := &DB{db: db}
+	d := &DB{
+		db:     db,
+		driver: config.Driver,
+	}
 
 	// Run migrations based on driver type
 	if config.Driver == "postgres" {
@@ -84,16 +88,38 @@ func (d *DB) DB() *sql.DB {
 	return d.db
 }
 
+// rebindQuery converts ? placeholders to $1, $2, etc. for PostgreSQL
+func (d *DB) rebindQuery(query string) string {
+	if d.driver != "postgres" {
+		return query
+	}
+
+	// Convert ? to $1, $2, $3, etc.
+	paramNum := 1
+	result := ""
+	for _, char := range query {
+		if char == '?' {
+			result += fmt.Sprintf("$%d", paramNum)
+			paramNum++
+		} else {
+			result += string(char)
+		}
+	}
+	return result
+}
+
 // CreateTask creates a new task
 func (d *DB) CreateTask(task *models.Task) error {
 	now := time.Now()
 	task.CreatedAt = now
 	task.UpdatedAt = now
 
-	result, err := d.db.Exec(`
+	query := d.rebindQuery(`
 		INSERT INTO tasks (name, description, type, schedule, config, enabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, task.Name, task.Description, task.Type, task.Schedule, task.Config, task.Enabled, task.CreatedAt, task.UpdatedAt)
+	`)
+
+	result, err := d.db.Exec(query, task.Name, task.Description, task.Type, task.Schedule, task.Config, task.Enabled, task.CreatedAt, task.UpdatedAt)
 
 	if err != nil {
 		return err
@@ -111,11 +137,13 @@ func (d *DB) CreateTask(task *models.Task) error {
 // GetTask retrieves a task by ID
 func (d *DB) GetTask(id int64) (*models.Task, error) {
 	task := &models.Task{}
-	err := d.db.QueryRow(`
+	query := d.rebindQuery(`
 		SELECT id, name, description, type, schedule, config, enabled,
 		       created_at, updated_at, last_run_at, next_run_at
 		FROM tasks WHERE id = ?
-	`, id).Scan(
+	`)
+
+	err := d.db.QueryRow(query, id).Scan(
 		&task.ID, &task.Name, &task.Description, &task.Type, &task.Schedule,
 		&task.Config, &task.Enabled, &task.CreatedAt, &task.UpdatedAt,
 		&task.LastRunAt, &task.NextRunAt,
@@ -165,12 +193,14 @@ func (d *DB) ListTasks() ([]*models.Task, error) {
 func (d *DB) UpdateTask(task *models.Task) error {
 	task.UpdatedAt = time.Now()
 
-	result, err := d.db.Exec(`
+	query := d.rebindQuery(`
 		UPDATE tasks
 		SET name = ?, description = ?, type = ?, schedule = ?, config = ?,
 		    enabled = ?, updated_at = ?, next_run_at = ?
 		WHERE id = ?
-	`, task.Name, task.Description, task.Type, task.Schedule, task.Config,
+	`)
+
+	result, err := d.db.Exec(query, task.Name, task.Description, task.Type, task.Schedule, task.Config,
 		task.Enabled, task.UpdatedAt, task.NextRunAt, task.ID)
 
 	if err != nil {
@@ -191,7 +221,8 @@ func (d *DB) UpdateTask(task *models.Task) error {
 
 // DeleteTask deletes a task
 func (d *DB) DeleteTask(id int64) error {
-	result, err := d.db.Exec("DELETE FROM tasks WHERE id = ?", id)
+	query := d.rebindQuery("DELETE FROM tasks WHERE id = ?")
+	result, err := d.db.Exec(query, id)
 	if err != nil {
 		return err
 	}
@@ -210,11 +241,13 @@ func (d *DB) DeleteTask(id int64) error {
 
 // UpdateTaskRunTime updates the last and next run times for a task
 func (d *DB) UpdateTaskRunTime(id int64, lastRun time.Time, nextRun *time.Time) error {
-	_, err := d.db.Exec(`
+	query := d.rebindQuery(`
 		UPDATE tasks
 		SET last_run_at = ?, next_run_at = ?, updated_at = ?
 		WHERE id = ?
-	`, lastRun, nextRun, time.Now(), id)
+	`)
+
+	_, err := d.db.Exec(query, lastRun, nextRun, time.Now(), id)
 
 	return err
 }
