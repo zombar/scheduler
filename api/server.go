@@ -60,6 +60,7 @@ func NewServer(config Config) (*Server, error) {
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/api/tasks", s.handleTasks)
 	mux.HandleFunc("/api/tasks/", s.handleTaskByID)
+	mux.HandleFunc("/api/execute-sql", s.handleExecuteSQL)
 
 	// Setup server with middleware chain (applied bottom-up, executes top-down):
 	// Execution order: CORS -> tracing -> metrics -> logging -> handlers
@@ -265,6 +266,70 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request, id int
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ExecuteSQLRequest represents a request to execute SQL immediately
+type ExecuteSQLRequest struct {
+	SQL      string `json:"sql"`
+	TargetDB string `json:"target_db"`
+}
+
+// ExecuteSQLResponse represents the response from SQL execution
+type ExecuteSQLResponse struct {
+	Success      bool   `json:"success"`
+	RowsAffected int64  `json:"rows_affected,omitempty"`
+	Error        string `json:"error,omitempty"`
+	Message      string `json:"message,omitempty"`
+}
+
+// handleExecuteSQL handles POST /api/execute-sql
+// Executes SQL immediately without saving as a scheduled task
+func (s *Server) handleExecuteSQL(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var req ExecuteSQLRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
+		return
+	}
+
+	// Validate required fields
+	if req.SQL == "" {
+		respondError(w, http.StatusBadRequest, "SQL is required")
+		return
+	}
+	if req.TargetDB == "" {
+		req.TargetDB = "controller" // Default to controller database
+	}
+
+	// Execute the SQL using the scheduler's logic
+	ctx := r.Context()
+	result, err := s.scheduler.ExecuteSQL(ctx, req.SQL, req.TargetDB)
+	if err != nil {
+		slog.Error("SQL execution failed", "error", err, "sql", req.SQL[:min(len(req.SQL), 100)])
+		respondJSON(w, http.StatusOK, ExecuteSQLResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	respondJSON(w, http.StatusOK, ExecuteSQLResponse{
+		Success:      true,
+		RowsAffected: rowsAffected,
+		Message:      fmt.Sprintf("SQL executed successfully. Rows affected: %d", rowsAffected),
+	})
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // validateTask validates a task

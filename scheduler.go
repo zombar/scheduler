@@ -244,6 +244,53 @@ func (s *Scheduler) executeSQLTask(ctx context.Context, task *models.Task) error
 	return nil
 }
 
+// ExecuteSQL executes SQL immediately without scheduling
+// This is used for the "Run Now" functionality
+func (s *Scheduler) ExecuteSQL(ctx context.Context, sqlQuery string, targetDB string) (sql.Result, error) {
+	ctx, span := tracing.StartSpan(ctx, "sql.execute_immediate")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("sql.target_db", targetDB))
+
+	// Validate SQL against whitelist
+	ctx, validateSpan := tracing.StartSpan(ctx, "sql.validate")
+	if err := validateSQL(sqlQuery); err != nil {
+		tracing.RecordError(ctx, err)
+		validateSpan.End()
+		return nil, fmt.Errorf("SQL validation failed: %w", err)
+	}
+	validateSpan.End()
+
+	// Execute SQL on target database
+	var db *sql.DB
+	switch targetDB {
+	case "controller":
+		db = s.controllerDB
+	default:
+		err := fmt.Errorf("unknown target database: %s", targetDB)
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
+	// Execute the SQL
+	ctx, execSpan := tracing.StartSpan(ctx, "sql.exec")
+	result, err := db.Exec(sqlQuery)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		execSpan.End()
+		return nil, fmt.Errorf("SQL execution failed: %w", err)
+	}
+
+	// Add result metrics
+	if rowsAffected, err := result.RowsAffected(); err == nil {
+		execSpan.SetAttributes(attribute.Int64("sql.rows_affected", rowsAffected))
+	}
+	execSpan.End()
+
+	return result, nil
+}
+
 // validateSQL validates SQL against a whitelist of allowed operations
 func validateSQL(sql string) error {
 	// Normalize SQL: remove extra whitespace and convert to lowercase
