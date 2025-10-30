@@ -37,6 +37,22 @@ func setupTestServer(t *testing.T) *Server {
 		t.Fatalf("Failed to create test server: %v", err)
 	}
 
+	// Create controller database tables for ExecuteSQL tests
+	_, err = server.scheduler.DB().Exec(`
+		CREATE TABLE IF NOT EXISTS documents (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			tombstone_datetime TIMESTAMP
+		);
+		CREATE TABLE IF NOT EXISTS images (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create test tables: %v", err)
+	}
+
 	return server
 }
 
@@ -521,5 +537,144 @@ func TestValidateTask(t *testing.T) {
 				t.Errorf("Expected no error, got: %v", err)
 			}
 		})
+	}
+}
+
+func TestHandleExecuteSQL(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	tests := []struct {
+		name           string
+		request        ExecuteSQLRequest
+		expectedStatus int
+		expectSuccess  bool
+	}{
+		{
+			name: "valid SQL - DELETE",
+			request: ExecuteSQLRequest{
+				SQL:      "DELETE FROM documents WHERE created_at < datetime('now', '-30 days')",
+				TargetDB: "controller",
+			},
+			expectedStatus: http.StatusOK,
+			expectSuccess:  true,
+		},
+		{
+			name: "valid SQL - UPDATE",
+			request: ExecuteSQLRequest{
+				SQL:      "UPDATE documents SET tombstone_datetime = NULL WHERE id = 1",
+				TargetDB: "controller",
+			},
+			expectedStatus: http.StatusOK,
+			expectSuccess:  true,
+		},
+		{
+			name: "empty SQL",
+			request: ExecuteSQLRequest{
+				SQL:      "",
+				TargetDB: "controller",
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectSuccess:  false,
+		},
+		{
+			name: "invalid SQL - not whitelisted",
+			request: ExecuteSQLRequest{
+				SQL:      "DROP TABLE documents",
+				TargetDB: "controller",
+			},
+			expectedStatus: http.StatusOK,
+			expectSuccess:  false,
+		},
+		{
+			name: "invalid SQL - SELECT not allowed",
+			request: ExecuteSQLRequest{
+				SQL:      "SELECT * FROM documents",
+				TargetDB: "controller",
+			},
+			expectedStatus: http.StatusOK,
+			expectSuccess:  false,
+		},
+		{
+			name: "default target DB",
+			request: ExecuteSQLRequest{
+				SQL: "DELETE FROM documents WHERE id = 999999",
+			},
+			expectedStatus: http.StatusOK,
+			expectSuccess:  true,
+		},
+		{
+			name: "invalid target DB",
+			request: ExecuteSQLRequest{
+				SQL:      "DELETE FROM documents WHERE id = 1",
+				TargetDB: "invalid_db",
+			},
+			expectedStatus: http.StatusOK,
+			expectSuccess:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, _ := json.Marshal(tt.request)
+			req := httptest.NewRequest(http.MethodPost, "/api/execute-sql", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
+
+			server.handleExecuteSQL(rr, req)
+
+			if status := rr.Code; status != tt.expectedStatus {
+				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, status)
+			}
+
+			if tt.expectedStatus == http.StatusOK {
+				var response ExecuteSQLResponse
+				if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+					t.Fatalf("Failed to decode response: %v", err)
+				}
+
+				if response.Success != tt.expectSuccess {
+					t.Errorf("Expected success=%v, got success=%v. Error: %s",
+						tt.expectSuccess, response.Success, response.Error)
+				}
+
+				if tt.expectSuccess && response.Message == "" {
+					t.Error("Expected message for successful execution")
+				}
+
+				if !tt.expectSuccess && response.Error == "" {
+					t.Error("Expected error message for failed execution")
+				}
+			}
+		})
+	}
+}
+
+func TestHandleExecuteSQLMethodNotAllowed(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/execute-sql", nil)
+	rr := httptest.NewRecorder()
+
+	server.handleExecuteSQL(rr, req)
+
+	if status := rr.Code; status != http.StatusMethodNotAllowed {
+		t.Errorf("Expected status code %d, got %d", http.StatusMethodNotAllowed, status)
+	}
+}
+
+func TestHandleExecuteSQLInvalidJSON(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/execute-sql", bytes.NewReader([]byte("invalid json")))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	server.handleExecuteSQL(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, status)
 	}
 }

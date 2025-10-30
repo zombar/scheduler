@@ -91,6 +91,11 @@ func (s *Scheduler) Stop() error {
 	return nil
 }
 
+// DB returns the controller database (for testing)
+func (s *Scheduler) DB() *sql.DB {
+	return s.controllerDB
+}
+
 // scheduleTask adds a task to the cron scheduler
 func (s *Scheduler) scheduleTask(task *models.Task) error {
 	s.mu.Lock()
