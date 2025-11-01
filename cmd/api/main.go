@@ -11,11 +11,11 @@ import (
 	"time"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
-	"github.com/zombar/purpletab/pkg/metrics"
-	"github.com/zombar/purpletab/pkg/tracing"
-	"github.com/zombar/scheduler"
-	"github.com/zombar/scheduler/api"
-	"github.com/zombar/scheduler/db"
+	"github.com/docutag/platform/pkg/metrics"
+	"github.com/docutag/platform/pkg/tracing"
+	"github.com/docutag/scheduler"
+	"github.com/docutag/scheduler/api"
+	"github.com/docutag/scheduler/db"
 )
 
 // getEnv retrieves an environment variable or returns a default value

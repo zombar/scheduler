@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zombar/scheduler/models"
+	"github.com/docutag/scheduler/models"
 )
 
 func TestNew(t *testing.T) {

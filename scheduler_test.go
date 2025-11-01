@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zombar/scheduler/db"
-	"github.com/zombar/scheduler/models"
+	"github.com/docutag/scheduler/db"
+	"github.com/docutag/scheduler/models"
 )
 
 // setupTestScheduler creates a test scheduler with in-memory databases

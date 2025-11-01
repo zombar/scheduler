@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
-	"github.com/zombar/purpletab/pkg/tracing"
-	"github.com/zombar/scheduler/db"
-	"github.com/zombar/scheduler/models"
+	"github.com/docutag/platform/pkg/tracing"
+	"github.com/docutag/scheduler/db"
+	"github.com/docutag/scheduler/models"
 	"go.opentelemetry.io/otel/attribute"
 )
 
