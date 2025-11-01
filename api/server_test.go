@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/zombar/scheduler"
-	"github.com/zombar/scheduler/db"
-	"github.com/zombar/scheduler/models"
+	"github.com/docutag/scheduler"
+	"github.com/docutag/scheduler/db"
+	"github.com/docutag/scheduler/models"
 )
 
 // setupTestServer creates a test server with in-memory database

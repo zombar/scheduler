@@ -10,12 +10,12 @@ import (
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/zombar/purpletab/pkg/metrics"
-	"github.com/zombar/purpletab/pkg/tracing"
-	"github.com/zombar/scheduler"
-	"github.com/zombar/scheduler/db"
-	"github.com/zombar/scheduler/models"
-	"github.com/zombar/scheduler/pkg/logging"
+	"github.com/docutag/platform/pkg/metrics"
+	"github.com/docutag/platform/pkg/tracing"
+	"github.com/docutag/scheduler"
+	"github.com/docutag/scheduler/db"
+	"github.com/docutag/scheduler/models"
+	"github.com/docutag/scheduler/pkg/logging"
 )
 
 // Config contains server configuration

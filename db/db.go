@@ -8,7 +8,7 @@ import (
 
 	_ "github.com/lib/pq"      // PostgreSQL driver
 	_ "modernc.org/sqlite"     // SQLite driver
-	"github.com/zombar/scheduler/models"
+	"github.com/docutag/scheduler/models"
 )
 
 // Config contains database configuration

@@ -1,14 +1,15 @@
-module github.com/zombar/scheduler
+module github.com/docutag/scheduler
 
 go 1.24.0
 
 toolchain go1.24.9
 
 require (
+	github.com/docutag/platform/pkg/metrics v0.0.0-00010101000000-000000000000
+	github.com/docutag/platform/pkg/tracing v0.0.0-00010101000000-000000000000
+	github.com/lib/pq v1.10.9
 	github.com/prometheus/client_golang v1.23.2
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/zombar/purpletab/pkg/metrics v0.0.0-00010101000000-000000000000
-	github.com/zombar/purpletab/pkg/tracing v0.0.0-00010101000000-000000000000
 	go.opentelemetry.io/otel v1.38.0
 	go.opentelemetry.io/otel/sdk v1.38.0
 	go.opentelemetry.io/otel/trace v1.38.0
@@ -16,7 +17,6 @@ require (
 )
 
 require (
-	github.com/XSAM/otelsql v0.40.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -27,7 +27,6 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
-	github.com/lib/pq v1.10.9 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
@@ -55,6 +54,6 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-replace github.com/zombar/purpletab/pkg/tracing => ../../pkg/tracing
+replace github.com/docutag/platform/pkg/tracing => ../../pkg/tracing
 
-replace github.com/zombar/purpletab/pkg/metrics => ../../pkg/metrics
+replace github.com/docutag/platform/pkg/metrics => ../../pkg/metrics
