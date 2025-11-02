@@ -56,7 +56,7 @@ func New(config Config) (*DB, error) {
 // migrate runs database migrations
 func (d *DB) migrate() error {
 	schema := `
-	CREATE TABLE IF NOT EXISTS tasks (
+	CREATE TABLE IF NOT EXISTS scheduler_tasks (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL,
 		description TEXT NOT NULL DEFAULT '',
@@ -70,8 +70,8 @@ func (d *DB) migrate() error {
 		next_run_at TIMESTAMP
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_tasks_enabled ON tasks(enabled);
-	CREATE INDEX IF NOT EXISTS idx_tasks_next_run_at ON tasks(next_run_at);
+	CREATE INDEX IF NOT EXISTS idx_scheduler_tasks_enabled ON scheduler_tasks(enabled);
+	CREATE INDEX IF NOT EXISTS idx_scheduler_tasks_next_run_at ON scheduler_tasks(next_run_at);
 	`
 
 	_, err := d.db.Exec(schema)
