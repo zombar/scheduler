@@ -18,7 +18,7 @@ var postgresMigrations = []Migration{
 		Version: 1,
 		Name:    "create_tasks_table",
 		SQL: `
-			CREATE TABLE IF NOT EXISTS tasks (
+			CREATE TABLE IF NOT EXISTS scheduler_tasks (
 				id SERIAL PRIMARY KEY,
 				name TEXT NOT NULL,
 				description TEXT NOT NULL DEFAULT '',
@@ -32,15 +32,15 @@ var postgresMigrations = []Migration{
 				next_run_at TIMESTAMPTZ
 			);
 
-			CREATE INDEX IF NOT EXISTS idx_tasks_enabled ON tasks(enabled);
-			CREATE INDEX IF NOT EXISTS idx_tasks_next_run_at ON tasks(next_run_at);
+			CREATE INDEX IF NOT EXISTS idx_scheduler_tasks_enabled ON scheduler_tasks(enabled);
+			CREATE INDEX IF NOT EXISTS idx_scheduler_tasks_next_run_at ON scheduler_tasks(next_run_at);
 		`,
 	},
 	{
 		Version: 2,
 		Name:    "create_schema_version_table",
 		SQL: `
-			CREATE TABLE IF NOT EXISTS schema_version (
+			CREATE TABLE IF NOT EXISTS scheduler_schema_version (
 				version INTEGER PRIMARY KEY,
 				applied_at TIMESTAMPTZ DEFAULT NOW()
 			);
@@ -59,7 +59,7 @@ func (d *DB) migratePostgres() error {
 	slog.Default().Info("checking current schema version")
 	// Get current version
 	var currentVersion int
-	err := d.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_version").Scan(&currentVersion)
+	err := d.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM scheduler_schema_version").Scan(&currentVersion)
 	if err != nil {
 		return fmt.Errorf("failed to get current version: %w", err)
 	}
@@ -85,7 +85,7 @@ func (d *DB) migratePostgres() error {
 		}
 
 		// Record migration (use PostgreSQL $1 placeholder instead of ?)
-		if _, err := tx.Exec("INSERT INTO schema_version (version) VALUES ($1)", migration.Version); err != nil {
+		if _, err := tx.Exec("INSERT INTO scheduler_schema_version (version) VALUES ($1)", migration.Version); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("failed to record migration %d: %w", migration.Version, err)
 		}

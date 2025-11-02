@@ -56,7 +56,7 @@ func New(config Config) (*DB, error) {
 // migrate runs database migrations
 func (d *DB) migrate() error {
 	schema := `
-	CREATE TABLE IF NOT EXISTS tasks (
+	CREATE TABLE IF NOT EXISTS scheduler_tasks (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL,
 		description TEXT NOT NULL DEFAULT '',
@@ -70,8 +70,8 @@ func (d *DB) migrate() error {
 		next_run_at TIMESTAMP
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_tasks_enabled ON tasks(enabled);
-	CREATE INDEX IF NOT EXISTS idx_tasks_next_run_at ON tasks(next_run_at);
+	CREATE INDEX IF NOT EXISTS idx_scheduler_tasks_enabled ON scheduler_tasks(enabled);
+	CREATE INDEX IF NOT EXISTS idx_scheduler_tasks_next_run_at ON scheduler_tasks(next_run_at);
 	`
 
 	_, err := d.db.Exec(schema)
@@ -117,7 +117,7 @@ func (d *DB) CreateTask(task *models.Task) error {
 	// PostgreSQL doesn't support LastInsertId(), use RETURNING clause instead
 	if d.driver == "postgres" {
 		query := `
-			INSERT INTO tasks (name, description, type, schedule, config, enabled, created_at, updated_at)
+			INSERT INTO scheduler_tasks (name, description, type, schedule, config, enabled, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			RETURNING id
 		`
@@ -127,7 +127,7 @@ func (d *DB) CreateTask(task *models.Task) error {
 
 	// SQLite supports LastInsertId()
 	query := d.rebindQuery(`
-		INSERT INTO tasks (name, description, type, schedule, config, enabled, created_at, updated_at)
+		INSERT INTO scheduler_tasks (name, description, type, schedule, config, enabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 
@@ -151,7 +151,7 @@ func (d *DB) GetTask(id int64) (*models.Task, error) {
 	query := d.rebindQuery(`
 		SELECT id, name, description, type, schedule, config, enabled,
 		       created_at, updated_at, last_run_at, next_run_at
-		FROM tasks WHERE id = ?
+		FROM scheduler_tasks WHERE id = ?
 	`)
 
 	err := d.db.QueryRow(query, id).Scan(
@@ -175,7 +175,7 @@ func (d *DB) ListTasks() ([]*models.Task, error) {
 	rows, err := d.db.Query(`
 		SELECT id, name, description, type, schedule, config, enabled,
 		       created_at, updated_at, last_run_at, next_run_at
-		FROM tasks
+		FROM scheduler_tasks
 		ORDER BY created_at DESC
 	`)
 	if err != nil {
@@ -205,7 +205,7 @@ func (d *DB) UpdateTask(task *models.Task) error {
 	task.UpdatedAt = time.Now()
 
 	query := d.rebindQuery(`
-		UPDATE tasks
+		UPDATE scheduler_tasks
 		SET name = ?, description = ?, type = ?, schedule = ?, config = ?,
 		    enabled = ?, updated_at = ?, next_run_at = ?
 		WHERE id = ?
@@ -232,7 +232,7 @@ func (d *DB) UpdateTask(task *models.Task) error {
 
 // DeleteTask deletes a task
 func (d *DB) DeleteTask(id int64) error {
-	query := d.rebindQuery("DELETE FROM tasks WHERE id = ?")
+	query := d.rebindQuery("DELETE FROM scheduler_tasks WHERE id = ?")
 	result, err := d.db.Exec(query, id)
 	if err != nil {
 		return err
@@ -253,7 +253,7 @@ func (d *DB) DeleteTask(id int64) error {
 // UpdateTaskRunTime updates the last and next run times for a task
 func (d *DB) UpdateTaskRunTime(id int64, lastRun time.Time, nextRun *time.Time) error {
 	query := d.rebindQuery(`
-		UPDATE tasks
+		UPDATE scheduler_tasks
 		SET last_run_at = ?, next_run_at = ?, updated_at = ?
 		WHERE id = ?
 	`)
@@ -268,7 +268,7 @@ func (d *DB) GetEnabledTasks() ([]*models.Task, error) {
 	rows, err := d.db.Query(`
 		SELECT id, name, description, type, schedule, config, enabled,
 		       created_at, updated_at, last_run_at, next_run_at
-		FROM tasks
+		FROM scheduler_tasks
 		WHERE enabled = true
 		ORDER BY id
 	`)
